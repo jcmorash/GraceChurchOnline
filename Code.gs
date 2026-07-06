@@ -1,6 +1,7 @@
 const SHEET_NAME = "MassCounts";
 const STORAGE_PROVIDER_DEFAULT = "sheets";
 const SUPABASE_TABLE_DEFAULT = "mass_counts";
+const SUPABASE_COMPAT_VIEW_DEFAULT = "v_mass_counts_compat";
 
 function testHealthCheck() {
   return { status: "ok", timestamp: new Date().toString() };
@@ -573,6 +574,7 @@ function normalizeRecord(input) {
   return {
     date: normalizeDate(input && input.date),
     mass: String(input && input.mass ? input.mass : ''),
+    source: String(input && input.source ? input.source : ''),
     altar: Number(input && input.altar) || 0,
     left_choir: Number(input && input.left_choir) || 0,
     right_choir: Number(input && input.right_choir) || 0,
@@ -682,12 +684,14 @@ function getSupabaseConfig() {
   const url = String(props.getProperty('SUPABASE_URL') || '').trim().replace(/\/+$/, '');
   const key = String(props.getProperty('SUPABASE_KEY') || '').trim();
   const table = String(props.getProperty('SUPABASE_TABLE') || SUPABASE_TABLE_DEFAULT).trim();
+  const compatView = String(props.getProperty('SUPABASE_COMPAT_VIEW') || SUPABASE_COMPAT_VIEW_DEFAULT).trim();
+  const phase2Enabled = String(props.getProperty('SUPABASE_PHASE2') || 'true').trim().toLowerCase() !== 'false';
 
   if (!url || !key) {
     throw new Error('SUPABASE_URL and SUPABASE_KEY must be set in Script Properties when STORAGE_PROVIDER=supabase.');
   }
 
-  return { url, key, table };
+  return { url, key, table, compatView, phase2Enabled };
 }
 
 function supabaseRequest(method, table, queryString, body, preferHeader) {
@@ -740,17 +744,41 @@ function mapSupabaseRecord(row) {
 
 function readAllAttendanceRecordsFromSupabase() {
   const config = getSupabaseConfig();
-  const query = [
+
+  if (config.phase2Enabled) {
+    try {
+      const phase2Query = [
+        'select=date,mass,altar,left_choir,right_choir,left_nave,right_nave,balcony,ushers,total',
+        'order=date.asc,mass.asc'
+      ].join('&');
+      const phase2Rows = supabaseRequest('get', config.compatView, phase2Query, null, null);
+      return phase2Rows.map(mapSupabaseRecord);
+    } catch (err) {
+      Logger.log('Phase-2 compat view unavailable, falling back to legacy table: ' + err);
+    }
+  }
+
+  const legacyQuery = [
     'select=date,mass,altar,left_choir,right_choir,left_nave,right_nave,balcony,ushers,total',
     'order=date.asc,mass.asc'
   ].join('&');
 
-  const rows = supabaseRequest('get', config.table, query, null, null);
-  return rows.map(mapSupabaseRecord);
+  const legacyRows = supabaseRequest('get', config.table, legacyQuery, null, null);
+  return legacyRows.map(mapSupabaseRecord);
 }
 
 function upsertAttendanceRecordToSupabase(record) {
   const config = getSupabaseConfig();
+
+  if (config.phase2Enabled) {
+    upsertAttendanceRecordToSupabasePhase2(record, config);
+    return;
+  }
+
+  upsertAttendanceRecordToSupabaseLegacy(record, config);
+}
+
+function upsertAttendanceRecordToSupabaseLegacy(record, config) {
   const row = {
     date: normalizeDate(record.date),
     mass: String(record.mass || ''),
@@ -766,6 +794,90 @@ function upsertAttendanceRecordToSupabase(record) {
 
   const query = 'on_conflict=date,mass';
   supabaseRequest('post', config.table, query, [row], 'resolution=merge-duplicates,return=minimal');
+}
+
+function getPrimaryChurchId(config) {
+  const rows = supabaseRequest('get', 'churches', 'select=church_id&order=created_at.asc&limit=1', null, null);
+  if (!rows || !rows.length || !rows[0].church_id) {
+    throw new Error('No church found in phase-2 schema. Ensure public.churches has at least one row.');
+  }
+  return String(rows[0].church_id);
+}
+
+function getSectionIdMap() {
+  const rows = supabaseRequest('get', 'attendance_sections', 'select=section_id,section_key', null, null);
+  const map = {};
+  rows.forEach((row) => {
+    const key = String(row.section_key || '').trim();
+    const value = String(row.section_id || '').trim();
+    if (key && value) {
+      map[key] = value;
+    }
+  });
+  return map;
+}
+
+function upsertAttendanceRecordToSupabasePhase2(record, config) {
+  const churchId = getPrimaryChurchId(config);
+  const source = String(record.source || 'app');
+
+  const entryRow = {
+    church_id: churchId,
+    attendance_date: normalizeDate(record.date),
+    mass_label: String(record.mass || ''),
+    total: Number(record.total) || 0,
+    source
+  };
+
+  const entryQuery = 'on_conflict=church_id,attendance_date,mass_label';
+  const entryRows = supabaseRequest('post', 'attendance_entries', entryQuery, [entryRow], 'resolution=merge-duplicates,return=representation');
+
+  let attendanceId = entryRows && entryRows.length ? String(entryRows[0].attendance_id || '') : '';
+  if (!attendanceId) {
+    const lookupQuery = [
+      'select=attendance_id',
+      `church_id=eq.${encodeURIComponent(churchId)}`,
+      `attendance_date=eq.${encodeURIComponent(entryRow.attendance_date)}`,
+      `mass_label=eq.${encodeURIComponent(entryRow.mass_label)}`,
+      'limit=1'
+    ].join('&');
+    const lookupRows = supabaseRequest('get', 'attendance_entries', lookupQuery, null, null);
+    attendanceId = lookupRows && lookupRows.length ? String(lookupRows[0].attendance_id || '') : '';
+  }
+
+  if (!attendanceId) {
+    throw new Error('Unable to resolve attendance_id for phase-2 write path.');
+  }
+
+  const sectionMap = getSectionIdMap();
+  const sectionValues = {
+    altar: Number(record.altar) || 0,
+    left_choir: Number(record.left_choir) || 0,
+    right_choir: Number(record.right_choir) || 0,
+    left_nave: Number(record.left_nave) || 0,
+    right_nave: Number(record.right_nave) || 0,
+    balcony: Number(record.balcony) || 0,
+    ushers: Number(record.ushers) || 0
+  };
+
+  const countRows = [];
+  Object.keys(sectionValues).forEach((sectionKey) => {
+    const sectionId = sectionMap[sectionKey];
+    if (!sectionId) {
+      return;
+    }
+
+    countRows.push({
+      attendance_id: attendanceId,
+      section_id: sectionId,
+      count_value: sectionValues[sectionKey]
+    });
+  });
+
+  if (countRows.length) {
+    const countsQuery = 'on_conflict=attendance_id,section_id';
+    supabaseRequest('post', 'attendance_entry_counts', countsQuery, countRows, 'resolution=merge-duplicates,return=minimal');
+  }
 }
 
 function escapeCsvCell(value) {
@@ -913,7 +1025,8 @@ function importAttendanceCsv(csvText) {
       right_nave: indexMap.right_nave === -1 ? 0 : Number(row[indexMap.right_nave]) || 0,
       balcony: indexMap.balcony === -1 ? 0 : Number(row[indexMap.balcony]) || 0,
       ushers: indexMap.ushers === -1 ? 0 : Number(row[indexMap.ushers]) || 0,
-      total: indexMap.total === -1 ? 0 : Number(row[indexMap.total]) || 0
+      total: indexMap.total === -1 ? 0 : Number(row[indexMap.total]) || 0,
+      source: 'csv_import'
     };
 
     if (!normalizeDate(record.date) || !String(record.mass || '').trim()) {
@@ -935,13 +1048,18 @@ function importAttendanceCsv(csvText) {
 function validateSupabaseConnection() {
   try {
     const config = getSupabaseConfig();
-    const query = 'select=date,mass&limit=1';
-    supabaseRequest('get', config.table, query, null, null);
+    if (config.phase2Enabled) {
+      supabaseRequest('get', config.compatView, 'select=date,mass&limit=1', null, null);
+      supabaseRequest('get', 'churches', 'select=church_id&limit=1', null, null);
+      supabaseRequest('get', 'attendance_sections', 'select=section_id,section_key&limit=10', null, null);
+    } else {
+      supabaseRequest('get', config.table, 'select=date,mass&limit=1', null, null);
+    }
 
     return {
       result: 'success',
       provider: 'supabase',
-      table: config.table,
+      table: config.phase2Enabled ? 'attendance_entries (+ compat view reads)' : config.table,
       message: 'Supabase connection verified.'
     };
   } catch (err) {
