@@ -932,6 +932,48 @@ function importAttendanceCsv(csvText) {
   };
 }
 
+function validateSupabaseConnection() {
+  try {
+    const config = getSupabaseConfig();
+    const query = 'select=date,mass&limit=1';
+    supabaseRequest('get', config.table, query, null, null);
+
+    return {
+      result: 'success',
+      provider: 'supabase',
+      table: config.table,
+      message: 'Supabase connection verified.'
+    };
+  } catch (err) {
+    return {
+      result: 'error',
+      message: err.toString()
+    };
+  }
+}
+
+function migrateSheetsDataToSupabase() {
+  try {
+    const config = getSupabaseConfig();
+    const records = readAllAttendanceRecordsFromSheets();
+
+    records.forEach((record) => {
+      upsertAttendanceRecordToSupabase(record);
+    });
+
+    return {
+      result: 'success',
+      migrated: records.length,
+      table: config.table
+    };
+  } catch (err) {
+    return {
+      result: 'error',
+      message: err.toString()
+    };
+  }
+}
+
 function buildWeeklyTrend(records) {
   const grouped = {};
 
