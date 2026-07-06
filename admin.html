@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+
+    .wrapper {
+      max-width: 700px;
+      margin: 24px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .back-link {
+      display: block;
+      margin-bottom: 20px;
+      text-align: center;
+      text-decoration: none;
+      color: #0066cc;
+      font-size: 16px;
+    }
+
+    .back-link:hover {
+      color: #004999;
+    }
+
+    .panel {
+      margin-top: 16px;
+      padding: 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fafafa;
+    }
+
+    .panel h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .muted {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .summary-card {
+      padding: 10px;
+      border-radius: 10px;
+      background: white;
+      border: 1px solid #e5e7eb;
+    }
+
+    .summary-card strong {
+      display: block;
+      font-size: 20px;
+      margin-top: 4px;
+    }
+
+    .list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .list li {
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <h1>Admin Panel</h1>
+
+    <a id="home-link" class="back-link" href="index.html">← Back to Home</a>
+
+    <div class="panel">
+      <h3>Attendance Analytics</h3>
+      <label for="forecastDate"><strong>Preview forecast for date</strong></label>
+      <input type="date" id="forecastDate" style="width: 100%; padding: 10px; margin-top: 8px; margin-bottom: 10px;">
+      <button id="loadAnalyticsBtn" style="padding: 10px 14px; border: none; border-radius: 8px; background: #2563eb; color: white;">Load Analytics</button>
+      <p id="statusText" class="muted">Loading analytics…</p>
+    </div>
+
+    <div class="panel">
+      <h3>CSV Tools</h3>
+      <p class="muted">Export all records or import a CSV to upsert by Date + Mass.</p>
+      <div style="display: grid; gap: 10px; margin-top: 10px;">
+        <button id="exportCsvBtn" style="padding: 10px 14px; border: none; border-radius: 8px; background: #15803d; color: white;">Export CSV</button>
+        <input type="file" id="importCsvFile" accept=".csv,text/csv" style="padding: 8px;">
+        <button id="importCsvBtn" style="padding: 10px 14px; border: none; border-radius: 8px; background: #b45309; color: white;">Import CSV</button>
+        <p id="csvStatusText" class="muted"></p>
+      </div>
+    </div>
+
+    <div id="analyticsContent"></div>
+  </div>
+
+  <script>
+        function setCsvStatus(message, isError) {
+          const csvStatus = document.getElementById('csvStatusText');
+          if (!csvStatus) {
+            return;
+          }
+
+          csvStatus.textContent = message || '';
+          csvStatus.style.color = isError ? '#b91c1c' : '#6b7280';
+        }
+
+    document.getElementById('home-link')?.addEventListener('click', function (event) {
+      event.preventDefault();
+      const url = new URL(window.location.href);
+      url.searchParams.set('page', 'index');
+      window.location.href = url.toString();
+    });
+
+    function renderBarChart(data, labelKey, valueKey, color, title) {
+      if (!data || !data.length) {
+        return '<p class="muted">Not enough data for this chart yet.</p>';
+      }
+
+      const values = data.map(item => Number(item[valueKey] || 0));
+      const maxValue = Math.max(...values, 1);
+      const width = 360;
+      const height = 180;
+      const padding = 24;
+      const chartHeight = height - padding * 2;
+      const barWidth = Math.max(16, (width - padding * 2 - (data.length - 1) * 8) / data.length);
+
+      const bars = data.map((item, index) => {
+        const value = Number(item[valueKey] || 0);
+        const barHeight = Math.max(6, (value / maxValue) * chartHeight);
+        const x = padding + index * (barWidth + 8);
+        const y = height - padding - barHeight;
+        return `
+          <rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" fill="${color}"></rect>
+          <text x="${x + barWidth / 2}" y="${height - 6}" text-anchor="middle" font-size="10" fill="#6b7280">${item[labelKey]}</text>
+          <text x="${x + barWidth / 2}" y="${y - 6}" text-anchor="middle" font-size="10" fill="#111827">${value}</text>`;
+      }).join('');
+
+      return `
+        <div class="panel">
+          <h3>${title}</h3>
+          <svg width="100%" height="220" viewBox="0 0 ${width} ${height}" role="img" aria-label="${title}">
+            <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#d1d5db"></line>
+            ${bars}
+          </svg>
+        </div>`;
+    }
+
+    function renderAnalytics(data) {
+      const content = document.getElementById('analyticsContent');
+      const status = document.getElementById('statusText');
+
+      if (!data || !data.totalRecords) {
+        status.textContent = 'No attendance data yet. Start entering attendance to build charts and forecasts.';
+        content.innerHTML = '';
+        return;
+      }
+
+      status.textContent = data.note || 'Analytics loaded.';
+
+      const forecastHtml = data.forecast ? `
+        <div class="panel">
+          <h3>Forecast for ${data.forecast.weekday}</h3>
+          <p class="muted">Prediction preview for ${data.forecast.date}</p>
+          <ul class="list">
+            ${Object.entries(data.forecast.byMass)
+              .filter(([, value]) => value !== null)
+              .map(([mass, value]) => `<li>${mass}: about ${value} attendees</li>`)
+              .join('')}
+          </ul>
+        </div>` : `
+        <div class="panel">
+          <h3>Forecast</h3>
+          <p class="muted">${data.note || 'Add more entries to generate a forecast.'}</p>
+        </div>`;
+
+      const recentHistoryHtml = data.recentHistory.length ? `
+        <div class="panel">
+          <h3>Recent History</h3>
+          <ul class="list">
+            ${data.recentHistory.map(item => `<li>${item.date} — ${item.mass}: ${item.total} attendees</li>`).join('')}
+          </ul>
+        </div>` : '';
+
+      const summariesHtml = `
+        <div class="panel">
+          <h3>Mass Averages</h3>
+          <div class="summary-grid">
+            ${data.summaries.map(item => `
+              <div class="summary-card">
+                <div>${item.mass}</div>
+                <strong>${item.averageAttendance}</strong>
+                <div class="muted">avg attendance</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+
+      const weeklyChartHtml = renderBarChart(data.weeklyTrend || [], 'label', 'averageAttendance', '#2563eb', 'Weekly Trend');
+      const yearOverYearChartHtml = data.yearOverYear && data.yearOverYear.length ? `
+        <div class="panel">
+          <h3>Year Over Year</h3>
+          <div style="display: grid; gap: 8px; margin-top: 8px;">
+            ${data.yearOverYear.map(item => `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; background: white; border: 1px solid #e5e7eb;">
+                <span>${item.month}</span>
+                <span><strong>${item.currentYear}</strong> vs ${item.previousYear}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>` : '<div class="panel"><h3>Year Over Year</h3><p class="muted">Not enough multi-year data yet.</p></div>';
+
+      content.innerHTML = `
+        <div class="panel">
+          <h3>Overview</h3>
+          <div class="summary-grid">
+            <div class="summary-card">
+              <div>Records</div>
+              <strong>${data.totalRecords}</strong>
+              <div class="muted">saved entries</div>
+            </div>
+            <div class="summary-card">
+              <div>First Entry</div>
+              <strong>${data.dateRange ? data.dateRange.first : '—'}</strong>
+              <div class="muted">earliest record</div>
+            </div>
+            <div class="summary-card">
+              <div>Latest Entry</div>
+              <strong>${data.dateRange ? data.dateRange.last : '—'}</strong>
+              <div class="muted">latest record</div>
+            </div>
+          </div>
+        </div>
+        ${summariesHtml}
+        ${weeklyChartHtml}
+        ${yearOverYearChartHtml}
+        ${recentHistoryHtml}
+        ${forecastHtml}
+      `;
+    }
+
+    function loadAnalytics() {
+      const date = document.getElementById('forecastDate').value;
+      const url = new URL(window.location.href);
+      const base = url.origin + url.pathname;
+      const params = new URLSearchParams();
+      params.set('page', 'admin');
+      params.set('action', 'analytics');
+      if (date) {
+        params.set('date', date);
+      }
+
+      fetch(base + '?' + params.toString())
+        .then(response => response.json())
+        .then(renderAnalytics)
+        .catch(() => {
+          document.getElementById('statusText').textContent = 'Unable to load analytics right now.';
+        });
+    }
+
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener('click', async () => {
+        try {
+          setCsvStatus('Exporting CSV...', false);
+          const response = await fetch(window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'action=export_csv');
+          const csvText = await response.text();
+          const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+          const objectUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = objectUrl;
+          link.download = 'attendance-export-' + new Date().toISOString().slice(0, 10) + '.csv';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(objectUrl);
+          setCsvStatus('CSV export complete.', false);
+        } catch (err) {
+          setCsvStatus('CSV export failed: ' + (err && err.message ? err.message : err), true);
+        }
+      });
+    }
+
+    const importCsvBtn = document.getElementById('importCsvBtn');
+    const importCsvFile = document.getElementById('importCsvFile');
+    if (importCsvBtn && importCsvFile) {
+      importCsvBtn.addEventListener('click', async () => {
+        const file = importCsvFile.files && importCsvFile.files[0];
+        if (!file) {
+          setCsvStatus('Please select a CSV file first.', true);
+          return;
+        }
+
+        try {
+          setCsvStatus('Importing CSV...', false);
+          const csvText = await file.text();
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            body: JSON.stringify({
+              action: 'import_csv',
+              csv: csvText
+            })
+          });
+
+          const data = await response.json();
+          if (!response.ok || (data && data.result === 'error')) {
+            throw new Error(data && data.message ? data.message : 'Server error during CSV import.');
+          }
+
+          setCsvStatus('CSV import complete. Imported: ' + Number(data.imported || 0) + ', skipped: ' + Number(data.skipped || 0) + '.', false);
+          loadAnalytics();
+        } catch (err) {
+          setCsvStatus('CSV import failed: ' + (err && err.message ? err.message : err), true);
+        }
+      });
+    }
+
+    document.getElementById('loadAnalyticsBtn').addEventListener('click', loadAnalytics);
+    loadAnalytics();
+  </script>
+</body>
+</html>

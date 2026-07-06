@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Attendance</title>
+
+  <style>
+    
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+    .ui-container {
+      margin-top: 20px;
+      padding: 20px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    }
+    .wrapper {
+      max-width: 600px;
+      margin: 24px auto;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .back-link {
+      display: block;
+      margin-bottom: 20px;
+      text-align: center;
+      text-decoration: none;
+      color: #0066cc;
+      font-size: 16px;
+    }
+
+    .back-link:hover {
+      color: #004999;
+    }
+
+    .mass-btn {
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      background: white;
+      color: #1f2937;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .mass-btn.active {
+      background: #2563eb;
+      color: white;
+      border-color: #2563eb;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1px solid #dbe2ea;
+      border-radius: 12px;
+      background: #ffffff;
+      font-size: 16px;
+      box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
+      outline: none;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .field-input:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), inset 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .status-text {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #6b7280;
+      min-height: 20px;
+    }
+
+    .status-text.error {
+      color: #dc2626;
+    }
+
+    .status-text.success {
+      color: #15803d;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <h1>Attendance</h1>
+
+    <a id="home-link" class="back-link" href="index.html">← Back to Home</a>
+
+    <div class="ui-container">
+
+      <!-- ⭐⭐⭐ UPDATED ATTENDANCE UI ⭐⭐⭐ -->
+
+      <!-- Date -->
+      <label for="dateInput"><strong>Date</strong></label>
+      <input type="date" id="dateInput" style="width: 100%; padding: 10px; margin-bottom: 15px;">
+
+      <!-- Mass -->
+      <label><strong>Mass</strong></label>
+      <div id="massButtons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 10px;">
+        <button type="button" class="mass-btn active" data-mass="7:45">7:45</button>
+        <button type="button" class="mass-btn" data-mass="9:00">9:00</button>
+        <button type="button" class="mass-btn" data-mass="10:30">10:30</button>
+        <button type="button" class="mass-btn" data-mass="Special">Special</button>
+      </div>
+      <div id="specialMassWrap" style="display: none; margin-bottom: 20px;">
+        <label for="specialMassInput"><strong>Special Mass Name</strong></label>
+        <input type="text" id="specialMassInput" placeholder="Enter custom mass time" style="width: 100%; padding: 10px; margin-top: 6px;">
+      </div>
+
+      <!-- Counters -->
+      <div style="display: grid; gap: 15px;">
+
+        <div class="field-group">
+          <label><strong>Altar</strong></label>
+          <input type="number" inputmode="numeric" pattern="[0-9]*" id="altar" value="0" min="0" class="field-input">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div class="field-group">
+            <label><strong>Left Choir</strong></label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="leftChoir" value="0" min="0" class="field-input">
+          </div>
+
+          <div class="field-group">
+            <label><strong>Right Choir</strong></label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="rightChoir" value="0" min="0" class="field-input">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div class="field-group">
+            <label><strong>Left Nave</strong></label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="leftNave" value="0" min="0" class="field-input">
+          </div>
+
+          <div class="field-group">
+            <label><strong>Right Nave</strong></label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="rightNave" value="0" min="0" class="field-input">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div class="field-group">
+            <label><strong>Balcony</strong></label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="balcony" value="0" min="0" class="field-input">
+          </div>
+
+          <div class="field-group">
+            <label><strong>Ushers</strong></label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="ushers" value="0" min="0" class="field-input">
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Mass Total -->
+      <div style="margin-top: 20px;" class="field-group">
+        <label><strong>Mass Total</strong></label>
+        <input type="number" inputmode="numeric" pattern="[0-9]*" id="massTotal" value="0" readonly class="field-input" style="background: #f3f4f6;">
+      </div>
+
+      <!-- Day Total -->
+      <div style="margin-top: 20px;" class="field-group">
+        <label><strong>Day Total</strong></label>
+        <input type="number" inputmode="numeric" pattern="[0-9]*" id="dayTotal" value="0" readonly class="field-input" style="background: #f3f4f6;">
+      </div>
+
+      <!-- Submit -->
+      <button id="submitBtn" style="
+        margin-top: 25px;
+        width: 100%;
+        padding: 15px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 18px;
+        font-weight: 600;
+      ">
+        Submit Attendance
+      </button>
+      <div id="submitStatus" class="status-text"> </div>
+
+    </div>
+  </div>
+
+  <!-- ⭐⭐⭐ UI SCRIPT ⭐⭐⭐ -->
+  <script>
+    document.getElementById('home-link')?.addEventListener('click', function (event) {
+      event.preventDefault();
+      const url = new URL(window.location.href);
+      url.searchParams.set('page', 'index');
+      window.location.href = url.toString();
+    });
+
+    function calculateMassTotal() {
+      const fields = [
+        'altar', 'leftChoir', 'rightChoir',
+        'leftNave', 'rightNave',
+        'balcony', 'ushers'
+      ];
+
+      let sum = 0;
+      fields.forEach(id => {
+        sum += Number(document.getElementById(id).value || 0);
+      });
+
+      document.getElementById('massTotal').value = sum;
+    }
+
+    // Recalculate mass total whenever any field changes
+    ['altar','leftChoir','rightChoir','leftNave','rightNave','balcony','ushers']
+      .forEach(id => {
+        document.getElementById(id).addEventListener('input', calculateMassTotal);
+      });
+
+    const massButtons = document.querySelectorAll('.mass-btn');
+    const specialMassWrap = document.getElementById('specialMassWrap');
+    const specialMassInput = document.getElementById('specialMassInput');
+    let selectedMass = '7:45';
+
+    function setSelectedMass(value) {
+      selectedMass = value;
+      massButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-mass') === value);
+      });
+
+      if (value === 'Special') {
+        specialMassWrap.style.display = 'block';
+      } else {
+        specialMassWrap.style.display = 'none';
+      }
+    }
+
+    massButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setSelectedMass(btn.getAttribute('data-mass'));
+      });
+    });
+
+    setSelectedMass('7:45');
+
+    // Submit handler
+    const submitBtn = document.getElementById('submitBtn');
+    const submitStatus = document.getElementById('submitStatus');
+
+    function setSubmitState(isSaving) {
+      submitBtn.disabled = isSaving;
+      submitBtn.style.opacity = isSaving ? '0.7' : '1';
+      submitBtn.textContent = isSaving ? 'Saving...' : 'Submit Attendance';
+    }
+
+    function showStatus(message, type) {
+      submitStatus.textContent = message;
+      submitStatus.className = 'status-text';
+      if (type === 'error') {
+        submitStatus.classList.add('error');
+      } else if (type === 'success') {
+        submitStatus.classList.add('success');
+      }
+    }
+
+    submitBtn.addEventListener('click', async () => {
+      const massValue = selectedMass === 'Special'
+        ? specialMassInput.value.trim()
+        : selectedMass;
+
+      if (!document.getElementById('dateInput').value) {
+        showStatus('Please select a date before submitting.', 'error');
+        return;
+      }
+
+      if (selectedMass === 'Special' && !massValue) {
+        showStatus('Please enter a special mass name.', 'error');
+        return;
+      }
+
+      const payload = {
+        date: document.getElementById('dateInput').value,
+        mass: massValue,
+        altar: Number(document.getElementById('altar').value),
+        left_choir: Number(document.getElementById('leftChoir').value),
+        right_choir: Number(document.getElementById('rightChoir').value),
+        left_nave: Number(document.getElementById('leftNave').value),
+        right_nave: Number(document.getElementById('rightNave').value),
+        balcony: Number(document.getElementById('balcony').value),
+        ushers: Number(document.getElementById('ushers').value),
+        total: Number(document.getElementById('massTotal').value)
+      };
+
+      setSubmitState(true);
+      showStatus('Saving attendance...', '');
+
+      const selectedDate = new Date(payload.date + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      try {
+        if (!isNaN(selectedDate.getTime()) && selectedDate.getTime() < today.getTime()) {
+          const lookupUrl = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'action=lookup&date=' + encodeURIComponent(payload.date) + '&mass=' + encodeURIComponent(payload.mass);
+          const lookupResponse = await fetch(lookupUrl);
+          const lookupData = await lookupResponse.json();
+          if (lookupData && lookupData.exists) {
+            const confirmed = window.confirm('A record already exists for this past date and mass. Saving now will overwrite it. Continue?');
+            if (!confirmed) {
+              showStatus('Save canceled. Existing past record was not changed.', '');
+              setSubmitState(false);
+              return;
+            }
+          }
+        }
+
+        const response = await fetch(window.location.href, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data && data.message ? data.message : 'The server returned an error.');
+        }
+
+        if (data && data.result === 'error') {
+          throw new Error(data.message || 'Unknown error while saving attendance.');
+        }
+
+        if (data && data.day_total !== undefined) {
+          document.getElementById('dayTotal').value = String(data.day_total);
+        }
+
+        showStatus('Attendance saved successfully.', 'success');
+      } catch (err) {
+        showStatus('Error saving attendance: ' + (err && err.message ? err.message : err), 'error');
+      } finally {
+        setSubmitState(false);
+      }
+    });
+  </script>
+</body>
+
+</html>

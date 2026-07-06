@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parish Tools</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
+    .wrapper { max-width: 700px; margin: 24px auto; background: white; padding: 24px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+    h1 { text-align: center; margin-bottom: 20px; }
+    .app-buttons { display: flex; flex-direction: column; gap: 12px; }
+    .app-btn { display: block; text-align: center; padding: 14px; background: #2563eb; color: white; text-decoration: none; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; }
+    .app-btn:hover { background: #1d4ed8; }
+    .back-link { display: block; margin-bottom: 20px; text-align: center; text-decoration: none; color: #2563eb; font-size: 16px; }
+    .back-link:hover { color: #1d4ed8; }
+    .ui-container { margin-top: 20px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background: #ffffff; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
+    .field-group { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 16px; background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%); box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05); }
+    .field-input { width: 100%; padding: 13px 14px; border: 1px solid #dbe2ea; border-radius: 12px; background: #ffffff; font-size: 16px; box-sizing: border-box; }
+    .mass-btn { padding: 12px; border: 1px solid #d1d5db; border-radius: 12px; background: white; color: #1f2937; cursor: pointer; font-size: 15px; font-weight: 600; }
+    .mass-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+    .status-text { margin-top: 10px; font-size: 14px; color: #6b7280; min-height: 20px; }
+    .status-text.error { color: #dc2626; }
+    .status-text.success { color: #15803d; }
+    .panel { margin-top: 16px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fafafa; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+    .summary-card { padding: 10px; border-radius: 10px; background: white; border: 1px solid #e5e7eb; }
+    .summary-card strong { display: block; font-size: 20px; margin-top: 4px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const app = document.getElementById('app');
+    const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz6fxM_Qzw7jIKkZV8zWc-Nac7H8uaZDIz8QSCktj8uIQlJpInXVb6VHu_YdFEfTxSaKg/exec';
+
+    function navigate(view) {
+      const url = new URL(window.location.href);
+      if (view === 'index') url.searchParams.delete('page');
+      else url.searchParams.set('page', view);
+      window.history.pushState({}, '', url.toString());
+      renderView();
+    }
+
+    function renderHome() {
+      app.innerHTML = `
+        <div class="wrapper">
+          <h1>Parish Tools</h1>
+          <div class="app-buttons">
+            <a href="#" class="app-btn" data-view="attendance">Attendance</a>
+            <a href="#" class="app-btn" data-view="admin">Admin</a>
+          </div>
+        </div>`;
+    }
+
+    function renderAttendance() {
+      app.innerHTML = `
+        <div class="wrapper">
+          <h1>Attendance</h1>
+          <a href="#" class="back-link" data-view="index">← Back to Home</a>
+          <div class="ui-container">
+            <label for="dateInput"><strong>Date</strong></label>
+            <input type="date" id="dateInput" style="width: 100%; padding: 10px; margin-bottom: 15px;">
+            <label><strong>Mass</strong></label>
+            <div id="massButtons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 10px;">
+              <button type="button" class="mass-btn active" data-mass="7:45">7:45</button>
+              <button type="button" class="mass-btn" data-mass="9:00">9:00</button>
+              <button type="button" class="mass-btn" data-mass="10:30">10:30</button>
+              <button type="button" class="mass-btn" data-mass="Special">Special</button>
+            </div>
+            <div id="specialMassWrap" style="display: none; margin-bottom: 20px;">
+              <label for="specialMassInput"><strong>Special Mass Name</strong></label>
+              <input type="text" id="specialMassInput" placeholder="Enter custom mass time" style="width: 100%; padding: 10px; margin-top: 6px;">
+            </div>
+            <div style="display: grid; gap: 15px;">
+              <div class="field-group">
+                <label><strong>Altar</strong></label>
+                <input type="number" inputmode="numeric" pattern="[0-9]*" id="altar" value="0" min="0" class="field-input">
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="field-group">
+                  <label><strong>Left Choir</strong></label>
+                  <input type="number" inputmode="numeric" pattern="[0-9]*" id="leftChoir" value="0" min="0" class="field-input">
+                </div>
+                <div class="field-group">
+                  <label><strong>Right Choir</strong></label>
+                  <input type="number" inputmode="numeric" pattern="[0-9]*" id="rightChoir" value="0" min="0" class="field-input">
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="field-group">
+                  <label><strong>Left Nave</strong></label>
+                  <input type="number" inputmode="numeric" pattern="[0-9]*" id="leftNave" value="0" min="0" class="field-input">
+                </div>
+                <div class="field-group">
+                  <label><strong>Right Nave</strong></label>
+                  <input type="number" inputmode="numeric" pattern="[0-9]*" id="rightNave" value="0" min="0" class="field-input">
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="field-group">
+                  <label><strong>Balcony</strong></label>
+                  <input type="number" inputmode="numeric" pattern="[0-9]*" id="balcony" value="0" min="0" class="field-input">
+                </div>
+                <div class="field-group">
+                  <label><strong>Ushers</strong></label>
+                  <input type="number" inputmode="numeric" pattern="[0-9]*" id="ushers" value="0" min="0" class="field-input">
+                </div>
+              </div>
+              <div class="field-group">
+                <label><strong>Total</strong></label>
+                <input type="number" inputmode="numeric" pattern="[0-9]*" id="massTotal" value="0" readonly class="field-input" style="background: #f3f4f6;">
+              </div>
+              <button id="submitBtn" style="margin-top: 25px; width: 100%; padding: 15px; background: #2563eb; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: 600;">Submit Attendance</button>
+              <div id="submitStatus" class="status-text"></div>
+            </div>
+          </div>
+        </div>`;
+      initAttendanceForm();
+    }
+
+    function initAttendanceForm() {
+      const massButtons = document.querySelectorAll('.mass-btn');
+      const specialMassWrap = document.getElementById('specialMassWrap');
+      const specialMassInput = document.getElementById('specialMassInput');
+      const submitBtn = document.getElementById('submitBtn');
+      const submitStatus = document.getElementById('submitStatus');
+      const homeLink = document.querySelector('[data-view="index"]');
+      const dateInput = document.getElementById('dateInput');
+      const numericFieldIds = ['altar', 'leftChoir', 'rightChoir', 'leftNave', 'rightNave', 'balcony', 'ushers'];
+
+      if (homeLink) homeLink.addEventListener('click', e => { e.preventDefault(); navigate('index'); });
+
+      function calculateMassTotal() {
+        let sum = 0;
+        numericFieldIds.forEach(id => { sum += Number(document.getElementById(id).value || 0); });
+        document.getElementById('massTotal').value = sum;
+      }
+
+      numericFieldIds.forEach(id => document.getElementById(id).addEventListener('input', calculateMassTotal));
+
+      function resetAttendanceFields() {
+        numericFieldIds.forEach(id => document.getElementById(id).value = '');
+        document.getElementById('massTotal').value = '0';
+      }
+
+      function populateAttendanceForm(record) {
+        const fieldMap = { altar: 'altar', leftChoir: 'leftChoir', rightChoir: 'rightChoir', leftNave: 'leftNave', rightNave: 'rightNave', balcony: 'balcony', ushers: 'ushers' };
+        Object.entries(fieldMap).forEach(([elementId, recordKey]) => {
+          const value = record && Object.prototype.hasOwnProperty.call(record, recordKey) ? record[recordKey] : '';
+          document.getElementById(elementId).value = value ?? '';
+        });
+        document.getElementById('massTotal').value = record && record.total !== undefined ? record.total : '0';
+      }
+
+      function getCurrentMassValue() {
+        return selectedMass === 'Special' ? specialMassInput.value.trim() : selectedMass;
+      }
+
+      function loadExistingAttendance() {
+        const selectedDate = dateInput.value;
+        const currentMass = getCurrentMassValue();
+        if (!selectedDate || !currentMass) { resetAttendanceFields(); return; }
+        fetch(BACKEND_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'lookup', date: selectedDate, mass: currentMass })
+        })
+          .then(r => r.json())
+          .then(record => {
+            if (record && record.exists) populateAttendanceForm(record);
+            else resetAttendanceFields();
+          })
+          .catch(() => resetAttendanceFields());
+      }
+
+      let selectedMass = '7:45';
+      function setSelectedMass(value) {
+        selectedMass = value;
+        massButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-mass') === value));
+        specialMassWrap.style.display = value === 'Special' ? 'block' : 'none';
+        resetAttendanceFields();
+        if (dateInput.value) loadExistingAttendance();
+      }
+
+      massButtons.forEach(btn => btn.addEventListener('click', () => setSelectedMass(btn.getAttribute('data-mass'))));
+      dateInput.addEventListener('change', loadExistingAttendance);
+      specialMassInput.addEventListener('input', loadExistingAttendance);
+      setSelectedMass('7:45');
+
+      function setSubmitState(isSaving) { submitBtn.disabled = isSaving; submitBtn.style.opacity = isSaving ? '0.7' : '1'; submitBtn.textContent = isSaving ? 'Saving...' : 'Submit Attendance'; }
+      function showStatus(message, type) { submitStatus.textContent = message; submitStatus.className = 'status-text'; if (type === 'error') submitStatus.classList.add('error'); else if (type === 'success') submitStatus.classList.add('success'); }
+
+      submitBtn.addEventListener('click', async () => {
+        const massValue = selectedMass === 'Special' ? specialMassInput.value.trim() : selectedMass;
+        if (!dateInput.value) { showStatus('Please select a date before submitting.', 'error'); return; }
+        if (selectedMass === 'Special' && !massValue) { showStatus('Please enter a special mass name.', 'error'); return; }
+        const payload = { date: dateInput.value, mass: massValue, altar: Number(document.getElementById('altar').value), left_choir: Number(document.getElementById('leftChoir').value), right_choir: Number(document.getElementById('rightChoir').value), left_nave: Number(document.getElementById('leftNave').value), right_nave: Number(document.getElementById('rightNave').value), balcony: Number(document.getElementById('balcony').value), ushers: Number(document.getElementById('ushers').value), total: Number(document.getElementById('massTotal').value) };
+        setSubmitState(true); showStatus('Saving attendance...', '');
+
+        const selectedDate = new Date(payload.date + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        try {
+          if (!isNaN(selectedDate.getTime()) && selectedDate.getTime() < today.getTime()) {
+            const lookupResponse = await fetch(BACKEND_URL, {
+              method: 'POST',
+              mode: 'cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'lookup', date: payload.date, mass: payload.mass })
+            });
+            const lookupData = await lookupResponse.json();
+            if (lookupData && lookupData.exists) {
+              const confirmed = window.confirm('A record already exists for this past date and mass. Saving now will overwrite it. Continue?');
+              if (!confirmed) {
+                showStatus('Save canceled. Existing past record was not changed.', '');
+                setSubmitState(false);
+                return;
+              }
+            }
+          }
+
+          const response = await fetch(BACKEND_URL, { method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const data = await response.json();
+          if (data && data.result === 'error') throw new Error(data.message || 'Unknown error');
+          document.getElementById('dayTotal').value = Number(data && data.day_total ? data.day_total : 0);
+          showStatus('Attendance saved successfully.', 'success');
+        } catch (err) {
+          showStatus('Error saving attendance: ' + (err.message || err), 'error');
+        } finally {
+          setSubmitState(false);
+        }
+      });
+    }
+
+    function renderAdmin() {
+      app.innerHTML = `
+        <div class="wrapper">
+          <h1>Admin Panel</h1>
+          <a href="#" class="back-link" data-view="index">← Back to Home</a>
+          <div class="panel">
+            <h3>Attendance Analytics</h3>
+            <label for="forecastDate"><strong>Preview forecast for date</strong></label>
+            <input type="date" id="forecastDate" style="width: 100%; padding: 10px; margin-top: 8px; margin-bottom: 10px;">
+            <button id="loadAnalyticsBtn" class="app-btn" style="padding: 10px 14px; border: none; border-radius: 8px; background: #2563eb; color: white;">Load Analytics</button>
+            <p id="statusText" class="muted">Loading analytics…</p>
+          </div>
+          <div class="panel">
+            <h3>CSV Tools</h3>
+            <p class="muted">Export all records or import a CSV to upsert by Date + Mass.</p>
+            <div style="display: grid; gap: 10px; margin-top: 10px;">
+              <button id="exportCsvBtn" class="app-btn" style="padding: 10px 14px; border: none; border-radius: 8px; background: #15803d; color: white;">Export CSV</button>
+              <input type="file" id="importCsvFile" accept=".csv,text/csv" style="padding: 8px;">
+              <button id="importCsvBtn" class="app-btn" style="padding: 10px 14px; border: none; border-radius: 8px; background: #b45309; color: white;">Import CSV</button>
+              <p id="csvStatusText" class="muted"></p>
+            </div>
+          </div>
+          <div id="analyticsContent"></div>
+        </div>`;
+      initAdmin();
+    }
+
+    function initAdmin() {
+      const button = document.getElementById('loadAnalyticsBtn');
+      const status = document.getElementById('statusText');
+      const content = document.getElementById('analyticsContent');
+      const forecastDate = document.getElementById('forecastDate');
+      const csvStatusText = document.getElementById('csvStatusText');
+
+      function setCsvStatus(message, isError) {
+        if (!csvStatusText) return;
+        csvStatusText.textContent = message || '';
+        csvStatusText.style.color = isError ? '#b91c1c' : '#6b7280';
+      }
+
+      button.addEventListener('click', () => {
+        const selectedDate = forecastDate.value;
+        if (!selectedDate) { status.textContent = 'Please select a date first.'; return; }
+        status.textContent = 'Loading analytics…';
+        fetch(BACKEND_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'analytics', date: selectedDate })
+        })
+          .then(r => r.json())
+          .then(data => {
+            content.innerHTML = `
+              <div class="panel">
+                <h3>Overview</h3>
+                <div class="summary-grid">
+                  <div class="summary-card"><span class="muted">Total records</span><strong>${data.totalRecords || 0}</strong></div>
+                  <div class="summary-card"><span class="muted">Masses</span><strong>${(data.masses || []).length}</strong></div>
+                </div>
+              </div>
+              <div class="panel">
+                <h3>Mass Summaries</h3>
+                <ul class="list">${(data.summaries || []).map(s => `<li>${s.mass}: avg ${s.averageAttendance}, latest ${s.latestAttendance}</li>`).join('')}</ul>
+              </div>
+              <div class="panel">
+                <h3>Recent History</h3>
+                <ul class="list">${(data.recentHistory || []).map(r => `<li>${r.date} • ${r.mass}: ${r.total}</li>`).join('')}</ul>
+              </div>
+              <div class="panel">
+                <h3>Forecast</h3>
+                <p class="muted">${data.note || 'No forecast yet.'}</p>
+              </div>`;
+          })
+          .catch(() => { status.textContent = 'Could not load analytics.'; });
+      });
+
+      const exportCsvBtn = document.getElementById('exportCsvBtn');
+      if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', async () => {
+          try {
+            setCsvStatus('Exporting CSV...', false);
+            const response = await fetch(BACKEND_URL + '?action=export_csv');
+            const csvText = await response.text();
+            const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = 'attendance-export-' + new Date().toISOString().slice(0, 10) + '.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(objectUrl);
+            setCsvStatus('CSV export complete.', false);
+          } catch (err) {
+            setCsvStatus('CSV export failed: ' + (err && err.message ? err.message : err), true);
+          }
+        });
+      }
+
+      const importCsvBtn = document.getElementById('importCsvBtn');
+      const importCsvFile = document.getElementById('importCsvFile');
+      if (importCsvBtn && importCsvFile) {
+        importCsvBtn.addEventListener('click', async () => {
+          const file = importCsvFile.files && importCsvFile.files[0];
+          if (!file) {
+            setCsvStatus('Please select a CSV file first.', true);
+            return;
+          }
+
+          try {
+            setCsvStatus('Importing CSV...', false);
+            const csvText = await file.text();
+            const response = await fetch(BACKEND_URL, {
+              method: 'POST',
+              mode: 'cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'import_csv', csv: csvText })
+            });
+            const data = await response.json();
+            if (!response.ok || (data && data.result === 'error')) {
+              throw new Error(data && data.message ? data.message : 'Server error during CSV import.');
+            }
+            setCsvStatus('CSV import complete. Imported: ' + Number(data.imported || 0) + ', skipped: ' + Number(data.skipped || 0) + '.', false);
+          } catch (err) {
+            setCsvStatus('CSV import failed: ' + (err && err.message ? err.message : err), true);
+          }
+        });
+      }
+    }
+
+    function renderView() {
+      const page = new URLSearchParams(window.location.search).get('page') || 'index';
+      if (page === 'admin') renderAdmin();
+      else if (page === 'attendance') renderAttendance();
+      else renderHome();
+    }
+
+    document.addEventListener('click', e => {
+      const link = e.target.closest('[data-view]');
+      if (link) { e.preventDefault(); navigate(link.getAttribute('data-view')); }
+    });
+
+    renderView();
+  </script>
+</body>
+</html>
